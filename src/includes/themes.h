@@ -5,6 +5,6 @@
 #include <Windows.h>
 
 int dark(HWND TBox, HWND TCtrl, HWND SBar);
-int light();
+int light(HWND TBox, HWND TCtrl, HWND SBar);
 
 #endif

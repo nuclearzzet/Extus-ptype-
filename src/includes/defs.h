@@ -43,7 +43,10 @@ enum PROGRAM_EVENTS
 struct
 {
     HWND hwnd, hTextBox, hSideBar, hTabControl;
-    HMENU hmenu, hFileSubMenu, hEditSubMenu, hSettingsSubMenu;
+    struct
+    {
+        HMENU hMenu, hFileSubMenu, hEditSubMenu, hSettingsSubMenu;
+    } Menu;
     BOOL isProject;
 } GUI;
 

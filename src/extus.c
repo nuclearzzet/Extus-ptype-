@@ -5,14 +5,16 @@
 
 extern LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 extern LRESULT CALLBACK PopupProcedure(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+extern int loadMenu();
 extern int makeMenu(enum MENU_IDS id, LPWSTR name, HMENU handle, HMENU subHandle);
 extern void windowResize();
-extern void createTextBox();
-extern void createSideBar();
-extern void insertIntoSideBar(EXDev *dev, HTREEITEM hPar);
-extern void createTabView();
+extern int createTextBox();
+extern int createSideBar();
+HTREEITEM insertIntoSideBar(LPWSTR name, HTREEITEM hPar);
+extern int createTabView();
 extern void insertIntoTabView(EXDev *dev, UINT ID);
 extern void createInputPopUp();
+extern int getDirsFiles();
 
 EXDev openFiles[25];
 
@@ -76,40 +78,23 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
     case WM_CREATE:
     {
         GUI.hwnd = hwnd;
-        GUI.hmenu = CreateMenu();
-        GUI.hFileSubMenu = CreatePopupMenu();
-        GUI.hSettingsSubMenu = CreatePopupMenu();
-        makeMenu(sFILE, L"&File", GUI.hmenu, GUI.hFileSubMenu);
-        makeMenu(sEDIT, L"&Edit", GUI.hmenu, GUI.hEditSubMenu);
-        makeMenu(sSETTINGS, L"&Settings", GUI.hmenu, GUI.hSettingsSubMenu);
-        SetMenu(GUI.hwnd, GUI.hmenu);
-        DrawMenuBar(GUI.hwnd);
+        if (loadMenu() == -1)
+            printf("Error loading menu");
 
-        // To add the items of the File popup menu
-        LPWSTR subFiles[8] = {L"&New txt File", L"&New File", L"&New Folder", L"&Open File", L"&Open Folder", L"&Save File", L"&Save All", L"&Close"};
-        for (int i = 0; i < 6; i++)
-        {
-            makeMenu(NEW_TXT_FILE + i, subFiles[i], GUI.hFileSubMenu, 0);
-        }
+        // HFONT font = AddFontResourceExW(
+        //     L"consolat.ttf\0",
+        //     FR_PRIVATE,
+        //     0);
+        // SendMessageW(GUI.hwnd, WM_SETFONT, (WPARAM)font, TRUE);
 
-        // To add the items of Settinfs popup menu
-        LPWSTR subSettings[5] = {L"&Themes", L"&Layout", L"&Keyboard Shortcuts", L"&Intelli-Sense", L"&Settings"};
-        for (int i = 0; i < 5; i++)
-        {
-            makeMenu(THEMES + i, subSettings[i], GUI.hSettingsSubMenu, 0);
-        }
+        if (createTextBox() == -1)
+            printf("TextBox creations failed");
 
-        createTextBox();
-        createSideBar();
-        createTabView();
+        if (createSideBar() == -1)
+            printf("Side Bar creation failes");
 
-        EXDev r;
-        r.fname = L"src";
-        EXDev s1;
-        s1.fname = L"includes";
-
-        insertIntoSideBar(&r, NULL);
-        insertIntoSideBar(&s1, r.fTreeHandle);
+        if (createTabView() == -1)
+            printf("Tab View creation failed");
 
         break;
     }
@@ -139,34 +124,22 @@ LRESULT CALLBACK WindowProcedure(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         return 0;
     }
 
-    case WM_CTLCOLORSCROLLBAR:
-        PAINTSTRUCT p_v, p_h;
-        HWND vscr = GetDlgItem(GUI.hTextBox, WS_VSCROLL);
-        HWND hscr = GetDlgItem(GUI.hTextBox, WS_HSCROLL);
-
-        HDC hdc_v = BeginPaint(vscr, &p_v);
-        HDC hdc_h = BeginPaint(hscr, &p_h);
-
-        HBRUSH col = CreateSolidBrush(RGB(18, 18, 74));
-
-        FillRect(hdc_v, &p_v.rcPaint, col);
-        FillRect(hdc_h, &p_h.rcPaint, col);
-
-        EndPaint(vscr, &p_v);
-        EndPaint(hscr, &p_h);
-
     case WM_PAINT:
     {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(GUI.hwnd, &ps);
 
-        HBRUSH bgc = CreateSolidBrush(RGB(0, 3, 41));
+        FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
 
-        FillRect(hdc, &ps.rcPaint, bgc);
-
-        dark(GUI.hTextBox, GUI.hTabControl, GUI.hSideBar);
+        light(GUI.hTextBox, GUI.hTabControl, GUI.hSideBar);
 
         EndPaint(GUI.hwnd, &ps);
+    }
+    case WM_CTLCOLOREDIT:
+    {
+        SetBkColor((HDC)wParam, RGB(229, 219, 219));
+
+        return (LRESULT)CreateSolidBrush(RGB(229, 219, 219));
     }
     case WM_COMMAND:
     {
@@ -235,6 +208,40 @@ void windowResize()
                  SWP_NOMOVE | SWP_NOZORDER | SWP_SHOWWINDOW);
 }
 
+/// @brief To Load the Menu called when WM_CREATE message is send to the Window Procedure
+/// @return 0 if it suceeds || -1 if it fails
+int loadMenu()
+{
+    GUI.Menu.hMenu = CreateMenu();
+    GUI.Menu.hFileSubMenu = CreatePopupMenu();
+    GUI.Menu.hEditSubMenu = CreatePopupMenu();
+    GUI.Menu.hSettingsSubMenu = CreatePopupMenu();
+
+    makeMenu(sFILE, L"&File", GUI.Menu.hMenu, GUI.Menu.hFileSubMenu);
+    makeMenu(sEDIT, L"&Edit", GUI.Menu.hMenu, GUI.Menu.hEditSubMenu);
+    makeMenu(sSETTINGS, L"&Settings", GUI.Menu.hMenu, GUI.Menu.hSettingsSubMenu);
+    SetMenu(GUI.hwnd, GUI.Menu.hMenu);
+    DrawMenuBar(GUI.hwnd);
+
+    // To add the items of the File popup menu
+    LPWSTR subFiles[8] = {L"&New txt File", L"&New File", L"&New Folder", L"&Open File", L"&Open Folder", L"&Save File", L"&Save All", L"&Close"};
+    for (int i = 0; i < 8; i++)
+    {
+        if (makeMenu(NEW_TXT_FILE + i, subFiles[i], GUI.Menu.hFileSubMenu, 0) == -1)
+            return -1;
+    }
+
+    // To add the items of Settinfs popup menu
+    LPWSTR subSettings[5] = {L"&Themes", L"&Layout", L"&Keyboard Shortcuts", L"&Intelli-Sense", L"&Settings"};
+    for (int i = 0; i < 5; i++)
+    {
+        if (makeMenu(THEMES + i, subSettings[i], GUI.Menu.hSettingsSubMenu, 0) == -1)
+            return -1;
+    }
+
+    return 0;
+}
+
 /// @brief To programmatically add the window
 /// @param id The id of the menu item
 /// @param name The name of the menu item
@@ -254,18 +261,41 @@ int makeMenu(UINT id, LPTSTR name, HMENU handle, HMENU subHandle)
 
     if (InsertMenuItemW(handle, id, TRUE, &m) == 0)
     {
-        printf("Error");
         return -1;
     }
 
     return 0;
 }
 
+int getDirsFiles()
+{
+    // WIN32_FIND_DATAW fData;
+
+    // HANDLE ff = FindFirstFileExW(
+    //     L".\\src",
+    //     FindExInfoBasic,
+    //     &fData,
+    //     FindExSearchLimitToDirectories,
+    //     NULL,
+    //     FIND_FIRST_EX_LARGE_FETCH);
+
+    // printf("%s", fData.cFileName);
+
+    LPWSTR rootDir = NULL;
+
+    GetCurrentDirectory(MAX_PATH, rootDir);
+
+    HTREEITEM root = insertIntoSideBar(rootDir, NULL);
+}
+
 /// @brief To create a text box for editing files
-void createTextBox()
+/// @return 0 if suceeds || -1 if failes
+int createTextBox()
 {
     RECT r = {0};
     GetClientRect(GUI.hwnd, &r);
+
+    GUI.hTextBox = NULL;
 
     GUI.hTextBox = CreateWindowEx(
         0,
@@ -277,10 +307,16 @@ void createTextBox()
         NULL,
         NULL,
         NULL);
+
+    if (GUI.hTextBox == NULL)
+        return -1;
+
+    return 0;
 }
 
 /// @brief To create a tree view for file exploration
-void createSideBar()
+/// @return If no errors returns 0 || -1
+int createSideBar()
 {
     RECT rM = {0};
     RECT rTB = {0};
@@ -288,6 +324,8 @@ void createSideBar()
     GetClientRect(GUI.hwnd, &rTB);
 
     InitCommonControls();
+
+    GUI.hSideBar = NULL;
 
     GUI.hSideBar = CreateWindowExW(
         WS_EX_TOOLWINDOW | WS_EX_CLIENTEDGE,
@@ -299,36 +337,41 @@ void createSideBar()
         NULL,
         NULL,
         NULL);
+
+    if (GUI.hSideBar == NULL)
+        return -1;
+    return 0;
 }
 
 /// @brief A function to input Items to the sidebar
 /// @param dev A pointer of type EXDev
 /// @param hPar The parent of a tree item (NULL)
-void insertIntoSideBar(EXDev *dev, HTREEITEM hPar)
+HTREEITEM insertIntoSideBar(LPWSTR name, HTREEITEM hPar)
 {
     TVITEMW tvi = {0};
     if (hPar != NULL)
         tvi.mask = TVIF_TEXT | TVIF_CHILDREN;
     else
         tvi.mask = TVIF_TEXT;
-    tvi.pszText = dev->fname;
-    tvi.cchTextMax = lstrlenW(dev->fname);
+    tvi.pszText = name;
+    tvi.cchTextMax = lstrlenW(name);
 
     TVINSERTSTRUCT tvis = {0};
     tvis.hParent = hPar;
     tvis.hInsertAfter = TVI_LAST;
     tvis.item = tvi;
 
-    dev->fTreeHandle = TreeView_InsertItem(GUI.hSideBar, &tvis);
+    return TreeView_InsertItem(GUI.hSideBar, &tvis);
 }
 
 /// @brief A Function to create the tab view
-void createTabView()
+/// @return 0 if suceeds || -1 if failes
+int createTabView()
 {
     INITCOMMONCONTROLSEX iccs = {0};
     RECT rM = {0};
     GetClientRect(GUI.hwnd, &rM);
-
+    GUI.hTabControl = NULL;
     iccs.dwSize = sizeof(INITCOMMONCONTROLSEX);
     iccs.dwICC = ICC_TAB_CLASSES;
 
@@ -344,6 +387,10 @@ void createTabView()
         NULL,
         NULL,
         NULL);
+
+    if (GUI.hTabControl == NULL)
+        return -1;
+    return 0;
 }
 
 /// @brief A function to add items to Tab-Control
